@@ -1,0 +1,117 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# Given dataset with Weight and MRP as features
+data = {
+    "ProductID": ["FDA01", "NCH42", "FDF46", "DRL35", "FDW46", "FDB58", "FDD47", "NCO17", "FDJ26", "FDU37"],
+    "Weight": [15, 6.86, 7.07, 15.7, 13, 10.5, 7.6, 10, 15.3, 9.5],
+    "MRP": [59.5904, 231.101, 116.0834, 43.277, 63.4484, 141.3154, 169.1448, 118.744, 214.6218, 79.796]
+}
+
+df = pd.DataFrame(data)
+
+# Extracting features (Weight and MRP)
+X = df[["Weight", "MRP"]].values
+
+
+# Function to compute Euclidean distance between data points and centroids
+def compute_distances(X, centroids):
+    distances = np.zeros((X.shape[0], len(centroids)))
+    for i, centroid in enumerate(centroids):
+        distances[:, i] = np.sqrt(np.sum((X - centroid) ** 2, axis=1))
+    return distances
+
+
+# Function to compute new centroids
+def compute_new_centroids(X, cluster_assignments, k):
+    new_centroids = np.zeros((k, X.shape[1]))
+    for i in range(k):
+        cluster_points = X[cluster_assignments == i]
+        if len(cluster_points) > 0:
+            new_centroids[i] = np.mean(cluster_points, axis=0)
+    return new_centroids
+
+
+# Manual k-Means implementation with tabular output
+def kmeans_manual(X, k, max_iters=100, tolerance=1e-4):
+    # Initialize centroids randomly from dataset points
+    np.random.seed(42)  # For reproducibility
+    initial_indices = np.random.choice(X.shape[0], k, replace=False)
+    centroids = X[initial_indices]
+
+    print("\nInitial Centroids:\n", pd.DataFrame(centroids, columns=["Weight", "MRP"]))
+
+    for iteration in range(max_iters):
+        print(f"\n Iteration {iteration + 1}:")
+
+        # Compute distances from points to centroids
+        distances = compute_distances(X, centroids)
+
+        # Create a DataFrame for the distance table
+        distance_df = pd.DataFrame(distances, columns=[f"Centroid {i}" for i in range(k)])
+        distance_df.insert(0, "ProductID", df["ProductID"])
+        print("\nDistance Table:")
+        print(distance_df.to_string(index=False))
+
+        # Assign clusters based on the closest centroid
+        cluster_assignments = np.argmin(distances, axis=1)
+
+        # Create a DataFrame for cluster assignments
+        assignment_df = pd.DataFrame({
+            "ProductID": df["ProductID"],
+            "Weight": df["Weight"],
+            "MRP": df["MRP"],
+            "Assigned Cluster": cluster_assignments
+        })
+        print("\nCluster Assignments:")
+        print(assignment_df.to_string(index=False))
+
+        # Compute new centroids
+        new_centroids = compute_new_centroids(X, cluster_assignments, k)
+
+        # Create a DataFrame for updated centroids
+        centroid_df = pd.DataFrame(new_centroids, columns=["Weight", "MRP"])
+        centroid_df.index.name = "Cluster"
+        print("\nUpdated Centroids:")
+        print(centroid_df)
+
+        # Check for convergence (if centroids do not change, stop)
+        if np.linalg.norm(new_centroids - centroids) < tolerance:
+            print("\nCentroids Converged! Stopping iterations.")
+            break
+
+        centroids = new_centroids  # Update centroids for next iteration
+
+    return cluster_assignments, centroids
+
+
+# Run k-Means manually for k=3
+final_clusters, final_centroids = kmeans_manual(X, k=3)
+
+print("\nFinal Cluster Assignments:")
+final_assignment_df = pd.DataFrame({
+    "ProductID": df["ProductID"],
+    "Weight": df["Weight"],
+    "MRP": df["MRP"],
+    "Final Cluster": final_clusters
+})
+print(final_assignment_df.to_string(index=False))
+
+print("\nFinal Centroids:")
+final_centroid_df = pd.DataFrame(final_centroids, columns=["Weight", "MRP"])
+final_centroid_df.index.name = "Cluster"
+print(final_centroid_df)
+
+# Visualizing the clusters
+plt.figure(figsize=(6, 6))
+for i in range(3):
+    plt.scatter(X[final_clusters == i, 0], X[final_clusters == i, 1], label=f'Cluster {i}')
+
+plt.scatter(final_centroids[:, 0], final_centroids[:, 1], s=200, c='red', marker='X', label='Centroids')
+
+plt.xlabel("Weight")
+plt.ylabel("MRP")
+plt.title("Manual k-Means Clustering")
+plt.legend()
+plt.show()
